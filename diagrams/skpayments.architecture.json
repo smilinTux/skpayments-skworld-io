@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "SKPayments Architecture",
+    "subtitle": "Multi-app Stripe subscription gateway: checkout, webhooks, and LiteLLM tier provisioning",
+    "output": "skpayments.architecture.html",
+    "quality_profile": "showcase"
+  },
+  "components": [
+    { "id": "user", "type": "frontend", "label": "User Browser", "sublabel": "completes payment on Stripe", "pos": [40, 70], "size": [160, 64] },
+    { "id": "app_backend", "type": "frontend", "label": "App Backend", "sublabel": "e.g. SKAI, any registered app", "pos": [40, 230], "size": [160, 64] },
+
+    { "id": "edge", "type": "cloud", "label": "Edge Network", "sublabel": "DNS and tunnel ingress", "pos": [280, 70], "size": [160, 64] },
+    { "id": "traefik", "type": "cloud", "label": "Traefik", "sublabel": "TLS termination and routing", "pos": [280, 230], "size": [160, 64] },
+
+    { "id": "api", "type": "backend", "label": "SKPayment API", "sublabel": "FastAPI, port 8000", "pos": [530, 170], "size": [170, 64] },
+    { "id": "db", "type": "database", "label": "SQLite", "sublabel": "customer and subscription records", "pos": [530, 30], "size": [170, 64] },
+    { "id": "config", "type": "database", "label": "apps.json", "sublabel": "per-app registry, bind mounted read only", "pos": [530, 310], "size": [170, 64] },
+
+    { "id": "litellm_skai", "type": "backend", "label": "LiteLLM, SKAI tier", "sublabel": "budget and rate limits", "pos": [790, 90], "size": [170, 64] },
+    { "id": "litellm_other", "type": "backend", "label": "LiteLLM, other apps", "sublabel": "same update path, any app", "pos": [790, 220], "size": [170, 64] },
+
+    { "id": "stripe_checkout", "type": "external", "label": "Stripe Checkout", "sublabel": "hosted payment session", "pos": [1050, 30], "size": [170, 64] },
+    { "id": "stripe_portal", "type": "external", "label": "Stripe Customer Portal", "sublabel": "self-serve plan management", "pos": [1050, 150], "size": [170, 64] },
+    { "id": "stripe_webhook", "type": "external", "label": "Stripe Webhooks", "sublabel": "subscription lifecycle events", "pos": [1050, 270], "size": [170, 64] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Client layer", "wraps": ["user", "app_backend"] },
+    { "kind": "region", "label": "Edge, Cloudflare tunnel", "wraps": ["edge", "traefik"] },
+    { "kind": "security-group", "label": "SKPayment deployment", "wraps": ["api", "db", "config"] },
+    { "kind": "region", "label": "Per-app LiteLLM", "wraps": ["litellm_skai", "litellm_other"] },
+    { "kind": "region", "label": "Stripe", "wraps": ["stripe_checkout", "stripe_portal", "stripe_webhook"] }
+  ],
+  "connections": [
+    { "id": "user-to-edge", "from": "user", "to": "edge", "label": "HTTPS", "variant": "default" },
+    { "id": "app-to-api", "from": "app_backend", "to": "api", "label": "POST /checkout/{app_id}", "variant": "emphasis" },
+    { "id": "edge-to-traefik", "from": "edge", "to": "traefik", "variant": "default" },
+    { "id": "traefik-to-api", "from": "traefik", "to": "api", "variant": "default" },
+    { "id": "webhook-to-edge", "from": "stripe_webhook", "to": "edge", "label": "POST /webhook/stripe, signed", "variant": "security" },
+    { "id": "api-to-checkout", "from": "api", "to": "stripe_checkout", "label": "create session", "variant": "default" },
+    { "id": "checkout-to-user", "from": "stripe_checkout", "to": "user", "label": "redirect to pay", "variant": "dashed" },
+    { "id": "api-to-portal", "from": "api", "to": "stripe_portal", "label": "portal link", "variant": "dashed" },
+    { "id": "api-to-db", "from": "api", "to": "db", "label": "read and write", "variant": "default" },
+    { "id": "api-to-config", "from": "api", "to": "config", "label": "read on restart", "variant": "dashed" },
+    { "id": "api-to-litellm-skai", "from": "api", "to": "litellm_skai", "label": "POST /user/update", "variant": "default" },
+    { "id": "api-to-litellm-other", "from": "api", "to": "litellm_other", "label": "POST /user/update", "variant": "dashed" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "One flow, any app", "items": ["An app backend calls POST /checkout/{app_id} directly, no new code per app", "Adding an app means editing apps.json and restarting the service, nothing else"] },
+    { "dot": "emerald", "title": "Checkout to tier, automatic", "items": ["Stripe fires checkout.session.completed, SKPayment upserts the customer row", "SKPayment then calls each app's LiteLLM with the new budget and rate limits"] },
+    { "dot": "rose", "title": "Webhook security", "items": ["Every Stripe event is HMAC verified against a per-deployment signing secret", "An invalid signature is rejected with 400, no spoofed tier upgrades"] }
+  ]
+}
