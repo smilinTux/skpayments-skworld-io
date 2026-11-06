@@ -441,6 +441,7 @@
       <li><a href="#features">Features</a></li>
       <li><a href="#lifecycle">Lifecycle</a></li>
       <li><a href="#api">API</a></li>
+      <li><a href="#architecture">Architecture</a></li>
       <li><a href="https://skworld.io">Suite</a></li>
       <li><a href="https://github.com/smilinTux/skpayments" target="_blank">GitHub</a></li>
     </ul>
@@ -666,6 +667,25 @@
 //                customer.subscription.updated
 //                customer.subscription.deleted
 //                invoice.payment_failed</pre>
+    </div>
+  </div>
+</section>
+
+<!-- Architecture -->
+<section id="architecture">
+  <div class="section-inner">
+    <div class="section-label">Architecture</div>
+    <h2>One payment API, mapped end to end</h2>
+    <p class="section-sub">The component map below is a standalone, self-contained page: explorable, with motion, and a dark and light toggle. It opens in a new tab.</p>
+    <div class="endpoint" style="text-align:left">
+      <div class="endpoint-head">
+        <span class="method-tag method-get">MAP</span>
+        <span class="endpoint-path">Client, edge, SKPayment API, per-app LiteLLM, Stripe</span>
+      </div>
+      <p style="color:rgba(255,255,255,.65); font-size:.88rem; margin-bottom:0">
+        Covers the full request shape: an app backend calling <code>/checkout/{app_id}</code> directly, the edge path a browser and Stripe webhooks share, the API's SQLite store and apps.json registry, and the fan out to each registered app's LiteLLM instance.
+        <a href="diagrams/skpayments.architecture.html" target="_blank" rel="noopener" style="color:var(--gold); font-weight:600">Open the interactive version &#8599;</a>
+      </p>
     </div>
   </div>
 </section>
